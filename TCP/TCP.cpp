@@ -9,11 +9,11 @@
 #define PORT 8080
 #define BUFFER_SIZE 1024
 
-#define SERVER_IP "127.0.0.1"
+#define SERVER_IP "192.168.149.171"
 
 void Server();
 void Client();
-int Error();
+void Error(const char print[]);
 
 int main() {
 	int con = -1;
@@ -102,7 +102,7 @@ void Server() {
 	//10
 	closesocket(client_fd);
 	closesocket(server_fd);
-	WSACleanup();
+	Error("Exit");
 	return;
 }
 
@@ -157,4 +157,7 @@ void Client() {
 	}
 
 	//7关闭
+	closesocket(sockfd);
+	Error("Exit");
+	return;
 }
