@@ -113,9 +113,10 @@ void Server() {
 	}
 
 	//9：发送响应数据
-	char messageCode[50] = { '\0' };
+	char messageCode[50];
 	int a = 0;
-	scanf_s(" %c", &messageCode[a++]);
+	while (getchar() == ' ');
+	while ((messageCode[a++] = getchar()) != '\n');
 	char* message = messageCode;
 	send(client_fd, message, strlen(message), 0);
 	printf("Response sent.\n");
@@ -148,10 +149,22 @@ void Client() {
 	}
 
 	//3:地址设置
-	char inputCode[50] = { '\0' };
+	char inputCode[50];
 	int i = 0;
-	scanf_s(" %c", &inputCode[i++]);
+	while (getchar() == ' ');
+	while ((inputCode[i++] = getchar()) != '\n');//这个方法会读到回车
+	//scanf_s(" %c", &inputCode[i++]);
+	
+	//printf("\ninput: %s\n", inputCode);
+	
+	//for (int i = 0;i<=strlen(inputCode);i++) {
+	//	printf(" %d[%d]",inputCode[i],i);
+	//}
+
+	inputCode[strlen(inputCode) - 1] = '\0';//这里要去掉回车
+	//printf("\nnumber: %d", decode_base62(inputCode));
 	char* serverIP = LongMathToIP(decode_base62(inputCode));
+	printf("\nIP: %s", serverIP);
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(PORT);
 	if (inet_pton(AF_INET, serverIP, &server_addr.sin_addr) <= 0) {
@@ -168,9 +181,10 @@ void Client() {
 	}
 
 	//5:发送数据
-	char messageCode[50] = { '\0' };
+	char messageCode[50];
 	int a = 0;
-	scanf_s(" %c", &messageCode[a++]);
+	while (getchar() == ' ');
+	while ((messageCode[a++] = getchar()) != '\n');
 	char* message = messageCode;
 	send(sockfd, message, strlen(message), 0);
 	printf("Sent: %s\n", message);
