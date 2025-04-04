@@ -27,6 +27,7 @@ unsigned long long IPChangeToLongMath(const char IP[]);
 char* LongMathToIP(unsigned long long num);
 char* encode_base62(unsigned long long num);
 unsigned long long decode_base62(const char* base62_str);
+void ServerExit(SOCKET server_fd, SOCKET* client_fd, int clientNum);
 
 
 
@@ -49,10 +50,14 @@ void Error(const char print[]) {
 
 void Server() {
 	WSADATA wsa;
-	SOCKET server_fd, client_fd;
-	struct sockaddr_in server_addr, client_addr;
-	int addr_len = sizeof(client_addr);
+	SOCKET server_fd,* client_fd;
+	struct sockaddr_in server_addr,* client_addr;
+	int clientNum = 1;
+	int addr_len = sizeof(client_addr[0]);
 	char buffer[BUFFER_SIZE] = { 0 };
+
+	client_fd = (SOCKET*)calloc(clientNum , sizeof(SOCKET));
+	client_addr = (sockaddr_in*)calloc(clientNum , sizeof(sockaddr_in));
 
 	//1:启用服务
 	if (WSAStartup(MAKEWORD(2, 2), &wsa)) {
@@ -79,7 +84,7 @@ void Server() {
 	}
 
 	//5：监听链接请求
-	if (listen(server_fd, 3) == SOCKET_ERROR) {
+	if (listen(server_fd, 5) == SOCKET_ERROR) {
 		Error("listen");
 		closesocket(server_fd);
 		return;
@@ -89,40 +94,82 @@ void Server() {
 
 	printf(" %s\n", encode_base62(IPChangeToLongMath(get_network_ips())));
 
+	while(1) {
+		for (int f = 0; f < clientNum ;f++) {
+			SOCKET* con_fd = NULL;
+			struct sockaddr_in* con_addr = NULL;
 
-	//6：接受请求
-	client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &addr_len);
-	if (client_fd == INVALID_SOCKET) {
-		Error("accept");
-		closesocket(server_fd);
-		return;
+			SOCKET con = NULL;
+			char client_ip[BUFFER_SIZE] = { 0 };
+			//6：接受请求
+			if (client_fd[f] == (con = accept(server_fd, (struct sockaddr*)&client_addr[f], &addr_len)))
+				goto massage;
+			clientNum++;
+			con_fd = (SOCKET*)realloc(client_fd, clientNum * sizeof(SOCKET));
+			con_addr = (sockaddr_in*)realloc(client_addr,clientNum * sizeof(sockaddr_in));
+			if (con_fd == NULL || con_addr == NULL) {
+				free(con_fd);
+				free(con_addr);
+				break;
+			}
+			client_fd = con_fd;
+			client_addr = con_addr;
+
+			client_fd[f] = con;
+			if (client_fd[f] == INVALID_SOCKET) {
+				//Error("accept");
+				//closesocket(server_fd);
+				free(con_fd);
+				free(con_addr);
+				break;
+			}
+
+			//7：打印客户IP与端口
+			inet_ntop(AF_INET, &client_addr[f].sin_addr, client_ip, INET_ADDRSTRLEN);
+			printf("Client connected from %s:%d（%d）\n", client_ip, ntohs(client_addr[f].sin_port),f);
+
+			//8：接收数据
+	massage:int bytes_received = recv(client_fd[f], buffer, BUFFER_SIZE, 0);
+			if (bytes_received == SOCKET_ERROR)
+				printf("recv failed:%d\n", WSAGetLastError());
+			else {
+				buffer[bytes_received] = '\0';
+				printf("Received: %s\n", buffer);
+			}
+
+			//9：发送响应数据
+			char messageCode[50];
+			int a = 0;
+			while (getchar() == ' ');
+			while ((messageCode[a++] = getchar()) != '\n');
+			char* message = messageCode;
+			send(client_fd[f], message, strlen(message), 0);
+			printf("Response sent.\n");
+
+			//释放
+			free(con_fd);
+			free(con_addr);
+		}
 	}
-
-	//7：打印客户IP与端口
-	char client_ip[BUFFER_SIZE] = { 0 };
-	inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
-	printf("Client connected from %s:%d\n", client_ip, ntohs(client_addr.sin_port));
-
-	//8：接收数据
-	int bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
-	if (bytes_received == SOCKET_ERROR)
-		printf("recv failed:%d\n", WSAGetLastError());
-	else {
-		buffer[bytes_received] = '\0';
-		printf("Received: %s\n", buffer);
-	}
-
-	//9：发送响应数据
-	char messageCode[50];
-	int a = 0;
-	while (getchar() == ' ');
-	while ((messageCode[a++] = getchar()) != '\n');
-	char* message = messageCode;
-	send(client_fd, message, strlen(message), 0);
-	printf("Response sent.\n");
 
 	//10结束
-	closesocket(client_fd);
+	for (int i = 0 ;i < clientNum;i++) {
+		closesocket(client_fd[i]);
+	}
+	closesocket(server_fd);
+
+	//自由
+	free(client_addr);
+	free(client_fd);
+
+	Error("Exit");
+	return;
+}
+
+void ServerExit(SOCKET server_fd, SOCKET* client_fd ,int clientNum) {
+	for (int i = 0; i < clientNum; i++) {
+		closesocket(client_fd[i]);
+	}
 	closesocket(server_fd);
 	Error("Exit");
 	return;
